@@ -1,5 +1,5 @@
 """Catálogo do PSDZData: séries, chassis, pacotes SWFL necessários e versões disponíveis."""
-import os, re, json, glob, threading
+import os, re, json, glob, threading, shutil
 from . import codegen
 
 SETTINGS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.json')
@@ -241,6 +241,15 @@ def package_status(kind, psdz=None):
 
 def packages_ok(kind): return package_status(kind)['ok']
 
+def _stage_link(src, dst):
+    """Stage a firmware package without requiring Windows symlink privileges."""
+    if os.path.lexists(dst): os.unlink(dst)
+    try: os.symlink(src, dst)
+    except OSError:
+        try: os.link(src, dst)
+        except OSError: shutil.copy2(src, dst)
+
+
 def stage_file(path, kind):
     # liga um arquivo escolhido no estágio; devolve (ok, mensagem). O nome precisa ser o de um pacote exigido
     path = os.path.abspath(os.path.expanduser(path or ''))
@@ -254,9 +263,8 @@ def stage_file(path, kind):
     d = os.path.join(STAGE, 'swe', 'swfl'); os.makedirs(d, exist_ok=True)
     dst = os.path.join(d, n)
     try:
-        if os.path.lexists(dst): os.unlink(dst)
-        os.symlink(path, dst)
-    except OSError as e: return False, 'não consegui gravar o link: %s' % e
+        _stage_link(path, dst)
+    except OSError as e: return False, 'não consegui preparar o arquivo: %s' % e
     return True, 'ok'
 
 def effective_psdz(kind):
@@ -270,7 +278,6 @@ def effective_psdz(kind):
             dst = os.path.join(d, i['file'])
             if not os.path.exists(dst):
                 try:
-                    if os.path.lexists(dst): os.unlink(dst)
-                    os.symlink(i['path'], dst)
+                    _stage_link(i['path'], dst)
                 except OSError: pass
     return STAGE

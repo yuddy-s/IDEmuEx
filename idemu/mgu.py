@@ -1,5 +1,9 @@
 """iDrive 8 (MGU22): monta a imagem a partir da PSdZData e roda QEMU `virt` + mguhost. Detalhes em docs/OUTRAS_GERACOES.md."""
-import _posixshmem, glob, json, mmap, os, shutil, struct, subprocess, sys, threading, time
+import glob, json, mmap, os, shutil, struct, subprocess, sys, threading, time
+try:
+    import _posixshmem
+except ImportError:
+    _posixshmem = None
 from . import runtime, coding8
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

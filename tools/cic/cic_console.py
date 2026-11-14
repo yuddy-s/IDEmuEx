@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Console do CIC: con.py [-w seg] 'linha' ... envia as linhas ao /dev/ser1 e imprime a saída."""
+"""Console do CIC: cic_console.py [-w seg] 'linha' ... envia as linhas ao /dev/ser1 e imprime a saída."""
 import os, socket, sys, time
 D = os.environ.get('CIC_DIR', '/tmp/cic')
 def main():

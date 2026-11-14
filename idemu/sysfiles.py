@@ -263,8 +263,13 @@ def reveal(env, env_dir, rel):
     try:
         d = _need(env, env_dir); p = resolve(d, rel)
     except ValueError as e: raise ApiError(str(e), 400)
-    r = subprocess.run(['open', '-R', p] if os.path.isfile(p) else ['open', p], capture_output=True, text=True)
-    if r.returncode: raise ApiError('não consegui abrir o Finder: %s' % r.stderr.strip()[:160], 500)
+    if sys.platform == 'win32':
+        if os.path.isfile(p): subprocess.Popen(['explorer.exe', '/select,', p])
+        else: os.startfile(p)
+    else:
+        opener = 'open' if sys.platform == 'darwin' else 'xdg-open'
+        r = subprocess.run([opener, '-R', p] if opener == 'open' and os.path.isfile(p) else [opener, p], capture_output=True, text=True)
+        if r.returncode: raise ApiError('não consegui abrir a pasta: %s' % r.stderr.strip()[:160], 500)
     return {'ok': True}
 
 def remove(env, env_dir):

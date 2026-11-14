@@ -1,5 +1,5 @@
 """Servidor HTTP local do IDEmu (API em docs/API.md + arquivos estáticos da GUI web)."""
-import os, re, subprocess, json, time, shutil, threading, traceback, mimetypes, datetime
+import os, re, subprocess, json, time, shutil, threading, traceback, mimetypes, datetime, sys, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from . import catalog, builder, runtime, codegen, coding, coding7, coding8, stats, mgu, mgu7, phone, cluster, cic, vin, sysfiles
@@ -7,7 +7,11 @@ from . import catalog, builder, runtime, codegen, coding, coding7, coding8, stat
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENVS = os.path.join(ROOT, 'environments')
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
-VERSION = '0.1'
+VERSION = '0.1-ex'
+NATIVE_VM_SUPPORTED = sys.platform != 'win32'
+WINDOWS_VM_MESSAGE = ('VM execution is not available on native Windows yet. '
+                      'IDEmuEx currently supports the interface and image tools; '
+                      'the QEMU devices and renderers still require a Windows backend. See docs/WINDOWS.md.')
 
 class ApiError(Exception):
     def __init__(self, msg, code=400): Exception.__init__(self, msg); self.code = code
@@ -85,8 +89,12 @@ class App:
         real = os.path.realpath(sp['path']); target = os.path.join(real, eid)
         if os.path.lexists(self.env_dir(eid)): raise ApiError('já existe um ambiente com esse id')
         if os.path.exists(target) and os.listdir(target): raise ApiError('já existe uma pasta "%s" com arquivos dentro da pasta escolhida' % eid)
+        created = not os.path.isdir(target)
         os.makedirs(target, exist_ok=True)
-        os.symlink(target, self.env_dir(eid))
+        try: os.symlink(target, self.env_dir(eid), target_is_directory=True)
+        except OSError as e:
+            if created: os.rmdir(target)
+            raise ApiError('cannot link the selected folder; on Windows enable Developer Mode or use the default location: %s' % e, 501)
         return real
     def _free_id(self, base, home=None):
         eid = base; i = 2
@@ -269,6 +277,7 @@ class App:
     def start(self, eid, cold=False, _flash=False):
         with self.lock: return self._start(eid, cold, _flash)
     def _start(self, eid, cold=False, _flash=False):
+        if sys.platform == 'win32': raise ApiError(WINDOWS_VM_MESSAGE, 501)
         if self.rt and self.rt.state in ('booting', 'running'): raise ApiError('já existe um ambiente em execução; pare-o primeiro')
         env = self.load_env(eid); env.pop('build', None); env.pop('snapshot', None)
         if self.build_info(eid)['state'] != 'ready': raise ApiError('compile o ambiente antes de iniciar')
@@ -456,7 +465,21 @@ def get_stats():
     return _STATS
 
 def native_pick(kind, prompt='', start=None):
-    """Seletor nativo do macOS (osascript). Devolve o caminho escolhido, ou None se o usuário cancelar. Levanta ApiError se não houver como abrir o diálogo."""
+    """Select local files/folders for browser users without the Electron picker."""
+    if sys.platform == 'win32':
+        try:
+            from tkinter import Tk, filedialog
+            root = Tk(); root.withdraw(); root.attributes('-topmost', True)
+            opts = {'title': prompt or 'Select a file'}
+            if start and os.path.isdir(os.path.expanduser(start)):
+                opts['initialdir'] = os.path.expanduser(start)
+            try:
+                if kind == 'folder': result = filedialog.askdirectory(parent=root, **opts)
+                elif kind == 'files': result = filedialog.askopenfilenames(parent=root, **opts)
+                else: result = filedialog.askopenfilename(parent=root, **opts)
+            finally: root.destroy()
+            return '\n'.join(result) if kind == 'files' else (result or None)
+        except ImportError: raise ApiError('Python tkinter is required for the Windows file picker', 501)
     import subprocess
     q = lambda x: '"' + str(x).replace('\\', '\\\\').replace('"', '\\"') + '"'
     loc = ''
@@ -547,7 +570,8 @@ class H(BaseHTTPRequestHandler):
         else: d = {}
         if path == 'state':
             return {'settings': {'psdz_path': catalog.load_settings().get('psdz_path'), 'psdz_ok': catalog.psdz_ok(catalog.load_settings().get('psdz_path')), 'ui_language': catalog.load_settings().get('ui_language', 'en')}, 'envs': A.list_envs(),
-                    'running': A.rt.id if A.rt and A.rt.state in ('booting', 'running') else None, 'version': VERSION}
+                    'running': A.rt.id if A.rt and A.rt.state in ('booting', 'running') else None, 'version': VERSION,
+                    'capabilities': {'vm': NATIVE_VM_SUPPORTED, 'host': sys.platform}}
         if path == 'settings' and m == 'POST' and 'ui_language' in d:
             if d['ui_language'] not in ('en', 'pt', 'es', 'fr', 'de', 'it', 'tr', 'ru', 'zh', 'ja'): raise ApiError('idioma inválido')
             catalog.save_settings({'ui_language': d['ui_language']}); return {'ok': True}
@@ -629,8 +653,10 @@ class H(BaseHTTPRequestHandler):
                 if len(P) > 3 and P[3] == 'reveal':
                     if m != 'POST': raise ApiError('use POST', 405)
                     os.makedirs(dd, exist_ok=True)
-                    r = subprocess.run(['open', dd], capture_output=True, text=True)
-                    if r.returncode: raise ApiError('não consegui abrir a pasta: %s' % r.stderr.strip()[:160], 500)
+                    if sys.platform == 'win32': os.startfile(dd)
+                    else:
+                        r = subprocess.run(['open' if sys.platform == 'darwin' else 'xdg-open', dd], capture_output=True, text=True)
+                        if r.returncode: raise ApiError('não consegui abrir a pasta: %s' % r.stderr.strip()[:160], 500)
                     return {'ok': True}
                 fl = cic.userfiles_list(A.env_dir(eid))
                 return {'dir': dd, 'mount': '/mnt/EFS_RO', 'files': fl, 'bytes': sum(f['size'] for f in fl)}
@@ -801,7 +827,8 @@ def serve(host='127.0.0.1', port=8765, open_browser=True):
         if getattr(APP, '_phone', None): APP._phone.stop()
         if APP.rt: APP.rt.stop()
         os._exit(0)
-    for sg in (signal.SIGTERM, signal.SIGHUP):
+    for sg in (signal.SIGTERM, getattr(signal, 'SIGHUP', None)):
+        if sg is None: continue
         signal.signal(sg, _bye)
     if open_browser:
         threading.Timer(0.6, lambda: _open(url)).start()
@@ -811,7 +838,8 @@ def serve(host='127.0.0.1', port=8765, open_browser=True):
         if APP.rt: APP.rt.stop()
 
 def _open(url):
-    import subprocess
+    if sys.platform != 'darwin':
+        webbrowser.open(url); return
     for app in ('Google Chrome', 'Chromium', 'Microsoft Edge', 'Brave Browser'):
         if os.path.isdir('/Applications/%s.app' % app):
             subprocess.Popen(['open', '-na', app, '--args', '--app=' + url, '--window-size=1400,900']); return

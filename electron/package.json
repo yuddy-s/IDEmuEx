@@ -1,7 +1,7 @@
 {
-  "name": "idemu-desktop",
+  "name": "idemu-ex-desktop",
   "version": "1.0.0",
-  "description": "IDEmu - emulador BMW iDrive (janela Electron)",
+  "description": "IDEmuEx - BMW iDrive tools (Electron window)",
   "main": "main.js",
   "private": true,
   "scripts": {

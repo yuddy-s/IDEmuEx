@@ -1,4 +1,6 @@
-# IDEmu — emulador de head unit BMW iDrive 6 (NBT Evo)
+# IDEmuEx — ferramentas e emulador BMW iDrive
+
+IDEmuEx é um fork não comercial do [IDEmu](https://github.com/herrbimmer/IDEmu). Esta versão abre a interface e algumas ferramentas no Windows, mas **a execução da máquina virtual no Windows ainda está em desenvolvimento**. Veja [o estado e a instalação no Windows](docs/WINDOWS.md). O fluxo original no macOS continua abaixo.
 
 Emulador baseado em QEMU (placa OMAP5 personalizada) que roda o software **original** da head unit
 (QNX 6.5 + HmiMain3D) a partir dos pacotes SWFL do PSDZData, com interface gráfica própria, rotor iDrive,

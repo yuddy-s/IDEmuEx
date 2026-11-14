@@ -80,6 +80,8 @@
         h('div', null, h('h1', null, 'Ambientes'),
           h('p', { class: 'sub' }, 'Cada ambiente é um carro virtual: modelo, arquivos SWFL e codificação. Compile, inicie e use.')),
         h('button', { class: 'btn primary lg', onclick: () => { IDE.wizard.reset(); IDE.go('novo'); } }, ic('plus', 18), 'Novo ambiente')),
+      IDE.state.capabilities && IDE.state.capabilities.host === 'win32'
+        ? h('div', { class: 'note warn' }, 'Windows preview: package browsing, environment setup and image tools are available. VM execution still needs a Windows QEMU and renderer backend. See docs/WINDOWS.md.') : null,
       grid);
     root.appendChild(page);
 
@@ -97,7 +99,7 @@
       const sn = e.snapshot || {};
       if (e.kind === 'cic' || e.kind === 'mgu22') return null;          // sem estado salvo (boot rápido) no CIC e iDrive 8
       const cb = h('input', { type: 'checkbox', checked: e.fast_boot !== false, disabled: running, 'aria-label': 'Fast boot', onchange: async () => { try { await post('/api/env/' + e.id + '/update', { fast_boot: cb.checked }); await IDE.refreshState(); } catch (er) { toastErr(er); } } });
-      const cold = h('button', { class: 'link', type: 'button', disabled: running || !!IDE.state.running, onclick: (ev) => startEnv(e, ev.currentTarget, true) }, 'Full boot');
+      const cold = h('button', { class: 'link', type: 'button', disabled: running || !!IDE.state.running || (IDE.state.capabilities && !IDE.state.capabilities.vm), onclick: (ev) => startEnv(e, ev.currentTarget, true) }, 'Full boot');
       const del = sn.valid ? h('button', { class: 'link', type: 'button', disabled: running, onclick: async () => { try { await post('/api/env/' + e.id + '/snapshot/delete'); await IDE.refreshState(); } catch (er) { toastErr(er); } } }, 'Delete saved state') : null;
       return h('div', { class: 'env-boot' },
         h('label', { class: 'check' }, cb, h('span', null, 'Fast boot')),
@@ -115,9 +117,9 @@
         actions.push(btn('primary', 'play', 'Abrir execução', () => IDE.go('execucao')));
         actions.push(btn('danger-o', 'stop', 'Parar', (b) => stopEnv(e, b)));
       } else {
-        const canStart = bs === 'ready' && !otherRunning;
+        const canStart = bs === 'ready' && !otherRunning && (!IDE.state.capabilities || IDE.state.capabilities.vm);
         const b = btn('success', 'play', 'Iniciar', (b) => startEnv(e, b),
-          bs !== 'ready' ? 'Compile o ambiente antes de iniciar' : (otherRunning ? 'Outro ambiente está em execução' : 'Iniciar o emulador'));
+          IDE.state.capabilities && !IDE.state.capabilities.vm ? 'VM execution is not available on this host yet' : (bs !== 'ready' ? 'Compile o ambiente antes de iniciar' : (otherRunning ? 'Outro ambiente está em execução' : 'Iniciar o emulador')));
         b.disabled = !canStart;
         actions.push(b);
       }

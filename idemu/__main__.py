@@ -1,7 +1,7 @@
 import sys, os, json
 from . import server
 
-USAGE = """IDEmu - emulador de head unit BMW iDrive 6 (NBT Evo)
+USAGE = """IDEmuEx - BMW iDrive head-unit tools
   python3 -m idemu gui [--port N] [--no-browser]   abre a interface gráfica
   python3 -m idemu list                            lista ambientes
   python3 -m idemu build <id>                      compila o ambiente a partir dos SWFL
@@ -34,7 +34,9 @@ def main(argv):
         return 0
     if cmd == 'run':
         import time
-        A.start(argv[1]); last = None
+        try: A.start(argv[1])
+        except server.ApiError as e: print('Error:', e, file=sys.stderr); return 1
+        last = None
         try:
             while True:
                 s = A.rt.status()

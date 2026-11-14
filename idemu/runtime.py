@@ -1,5 +1,5 @@
 """Execução de um ambiente: renderizador (glhost) + QEMU + console serial + canais (shell, dados) + CAN/GPS/SSH."""
-import os, sys, time, json, shlex, hashlib, socket, select, subprocess, threading, signal, mmap, struct, zlib, collections
+import os, sys, time, json, shlex, hashlib, socket, select, subprocess, threading, signal, mmap, struct, zlib, collections, tempfile, getpass
 from . import mapsvc, catalog
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +18,10 @@ SETBITS = '0x4a096804=2,0x4809a130=0x26,0x4a008f00=0x100,0x4a004400=0x100'
 # núcleos do OMAP5 emulados (1 ou 2). Com 2, cada vCPU roda numa thread do Mac (MTTCG) e o QNX (procnto-smp) distribui HMI e serviços entre eles.
 SMP = max(1, min(2, int(os.environ.get('IDEMU_SMP', '1') or 1)))
 QEMU_ARM = os.environ.get('IDEMU_QEMU_ARM') or os.path.join(BIN, 'qemu-system-arm')
+
+def default_run_root():
+    if hasattr(os, 'getuid'): return '/tmp/idemu-%d' % os.getuid()
+    return os.path.join(tempfile.gettempdir(), 'idemu-' + getpass.getuser())
 
 def _unix_connect(path, timeout=30):
     end = time.time() + timeout
@@ -136,7 +140,7 @@ class Runtime:
     def __init__(self, env_dir, env, run_root=None):
         self.env_dir, self.env = env_dir, env
         self.id = env['id']
-        self.run = os.path.join(run_root or '/tmp/idemu-%d' % os.getuid(), self.id)
+        self.run = os.path.join(run_root or default_run_root(), self.id)
         self.img = os.path.join(env_dir, 'images'); self.logd = os.path.join(env_dir, 'logs')
         self.ctl = os.path.join(self.run, 'ctl')
         self.state = 'stopped'; self.err = None; self.t0 = None; self.step = ''; self.pct = 0

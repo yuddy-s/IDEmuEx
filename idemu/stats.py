@@ -27,6 +27,7 @@ def ps_info(pids):
     """{pid: (cpu_seconds, rss_kb, vsz_kb)} num único `ps`."""
     pids = [p for p in pids if p]
     if not pids: return {}
+    if os.name == 'nt': return _windows_ps_info(pids)
     out = _run(['ps', '-o', 'pid=,time=,rss=,vsz=', '-p', ','.join(str(p) for p in pids)])
     res = {}
     for line in out.splitlines():
@@ -35,6 +36,54 @@ def ps_info(pids):
             t = _cputime(f[1])
             if t is not None: res[int(f[0])] = (t, int(f[2]), int(f[3]))
     return res
+
+
+def _windows_ps_info(pids):
+    import ctypes
+    from ctypes import wintypes
+    size_t = ctypes.c_size_t
+    class FileTime(ctypes.Structure):
+        _fields_ = [('low', wintypes.DWORD), ('high', wintypes.DWORD)]
+    class MemoryCounters(ctypes.Structure):
+        _fields_ = [('cb', wintypes.DWORD), ('faults', wintypes.DWORD),
+                    ('peak_working', size_t), ('working', size_t),
+                    ('peak_paged', size_t), ('paged', size_t),
+                    ('peak_nonpaged', size_t), ('nonpaged', size_t),
+                    ('pagefile', size_t), ('peak_pagefile', size_t), ('private', size_t)]
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    psapi = ctypes.WinDLL('psapi', use_last_error=True)
+    kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = (wintypes.HANDLE, ctypes.POINTER(FileTime), ctypes.POINTER(FileTime), ctypes.POINTER(FileTime), ctypes.POINTER(FileTime))
+    kernel.GetProcessTimes.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    psapi.GetProcessMemoryInfo.argtypes = (wintypes.HANDLE, ctypes.POINTER(MemoryCounters), wintypes.DWORD)
+    psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+    result = {}
+    for pid in pids:
+        handle = kernel.OpenProcess(0x1000 | 0x0400, False, pid)
+        if not handle: continue
+        try:
+            created, exited, user, system = FileTime(), FileTime(), FileTime(), FileTime()
+            mem = MemoryCounters(); mem.cb = ctypes.sizeof(mem)
+            if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited), ctypes.byref(system), ctypes.byref(user)): continue
+            if not psapi.GetProcessMemoryInfo(handle, ctypes.byref(mem), mem.cb): continue
+            ticks = lambda t: (t.high << 32) | t.low
+            result[pid] = ((ticks(user) + ticks(system)) / 1e7, mem.working // 1024, mem.private // 1024)
+        finally: kernel.CloseHandle(handle)
+    return result
+
+
+def host_ram_bytes():
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        class MemoryStatus(ctypes.Structure):
+            _fields_ = [('length', wintypes.DWORD), ('load', wintypes.DWORD)] + [
+                (name, ctypes.c_ulonglong) for name in ('total_phys', 'avail_phys', 'total_page', 'avail_page', 'total_virtual', 'avail_virtual', 'avail_extended')]
+        status = MemoryStatus(); status.length = ctypes.sizeof(status)
+        return status.total_phys if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)) else 0
+    return Sampler._sysctl('hw.memsize')
 
 def gpu_info():
     """Uso da GPU do sistema (não por processo: o macOS não expõe isso sem privilégios)."""
@@ -73,7 +122,7 @@ class Sampler:
         self.frames = collections.deque(maxlen=2000)         # instantes (s) em que o renderizador entregou um quadro
         self.lock = threading.Lock()
         self.run_key = None; self.last = None
-        self.static = {'host_ram_mb': self._sysctl('hw.memsize') // (1 << 20), 'cores': os.cpu_count() or 1, 'gpu': None, 'guest_ram_mb': 2048}
+        self.static = {'host_ram_mb': host_ram_bytes() // (1 << 20), 'cores': os.cpu_count() or 1, 'gpu': None, 'guest_ram_mb': 2048}
         self.storage = {}; self.storage_t = {}
         self._stop = threading.Event(); self.seen = 0.0          # última consulta de /api/stats: sem ninguém olhando, a amostragem para
         threading.Thread(target=self._fast, daemon=True).start()
@@ -175,7 +224,8 @@ class Sampler:
             p = os.path.join(d, n)
             other += dir_size(p) if os.path.isdir(p) else os.path.getsize(p)
         if other: parts.append({'id': 'other', 'label': 'Outros', 'bytes': other}); total += other
-        run = os.path.join('/tmp/idemu-%d' % os.getuid(), eid)
+        from . import runtime
+        run = os.path.join(runtime.default_run_root(), eid)
         rb = dir_size(run) if os.path.isdir(run) else 0
         if rb: parts.append({'id': 'run', 'label': 'Temporários da execução', 'bytes': rb}); total += rb
         du = shutil.disk_usage(d)

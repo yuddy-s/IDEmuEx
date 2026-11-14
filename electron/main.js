@@ -1,5 +1,5 @@
 'use strict';
-// IDEmu desktop: abre a interface em uma janela do Electron. O servidor continua sendo o mesmo (python3 -m idemu gui),
+// IDEmuEx desktop: opens the Python web interface in an Electron window.
 // iniciado aqui como processo filho numa porta livre e encerrado junto com a janela.
 const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
 const { spawn } = require('child_process');
@@ -30,8 +30,9 @@ function waitUp(p, tries = 120) {
 }
 
 function startServer(p) {
-  const py = process.env.IDEMU_PYTHON || '/usr/bin/python3';
-  server = spawn(py, ['-m', 'idemu', 'gui', '--no-browser', '--port', String(p)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  const py = process.env.IDEMU_PYTHON || (process.platform === 'win32' ? 'py' : process.platform === 'darwin' ? '/usr/bin/python3' : 'python3');
+  const pyArgs = !process.env.IDEMU_PYTHON && process.platform === 'win32' ? ['-3'] : [];
+  server = spawn(py, [...pyArgs, '-m', 'idemu', 'gui', '--no-browser', '--port', String(p)], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
   const keep = (d) => { log = (log + d.toString()).slice(-4000); };
   server.stdout.on('data', keep); server.stderr.on('data', keep);
@@ -48,7 +49,7 @@ function stopServer() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1440, height: 920, minWidth: 900, minHeight: 600, title: 'IDEmu', backgroundColor: '#1c1c1e', show: false,
+    width: 1440, height: 920, minWidth: 900, minHeight: 600, title: 'IDEmuEx', backgroundColor: '#1c1c1e', show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default', trafficLightPosition: { x: 16, y: 16 },
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
