@@ -8,7 +8,8 @@ def is_wsl():
     if sys.platform != 'linux': return False
     if os.environ.get('WSL_DISTRO_NAME') or os.environ.get('WSL_INTEROP'): return True
     try:
-        return 'microsoft' in open('/proc/sys/kernel/osrelease').read().lower()
+        with open('/proc/sys/kernel/osrelease', encoding='ascii') as f:
+            return 'microsoft' in f.read().lower()
     except OSError:
         return False
 
