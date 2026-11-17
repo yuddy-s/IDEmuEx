@@ -50,4 +50,4 @@ jobs:
       - name: Build and probe custom device
         run: |
           tools/wsl/build-qemu.sh /tmp/qemu-11.1.2.tar.xz
-          bin/qemu-system-x86_64 -device help 2>&1 | grep -q idemu-shm
+          tools/wsl/smoke-qemu.sh

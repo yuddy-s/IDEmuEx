@@ -6,7 +6,7 @@ if ! grep -qi microsoft /proc/sys/kernel/osrelease; then
 fi
 sudo apt-get update
 sudo apt-get install -y \
-  build-essential clang lld git curl xz-utils python3 python3-tk \
+  build-essential clang lld git curl xz-utils python3 python3-venv python3-tk \
   ninja-build pkg-config libglib2.0-dev libpixman-1-dev \
   libegl1-mesa-dev libgl-dev mesa-utils
 echo "Dependencies installed. Build the renderer with: src/mgu/build_host.sh"

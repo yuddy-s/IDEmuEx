@@ -26,7 +26,7 @@ cd "$WORK/build"
 if [[ ! -f build.ninja ]]; then
   "$SRC/configure" --target-list=x86_64-softmmu --disable-docs --disable-guest-agent \
     --disable-gtk --disable-sdl --disable-vnc --disable-curses --disable-rust \
-    --disable-user --disable-linux-user --disable-bsd-user --without-default-features --enable-tcg
+    --disable-user --disable-linux-user --disable-bsd-user --without-default-features --enable-tcg --enable-tools
 fi
 ninja qemu-system-x86_64 qemu-img
 mkdir -p "$ROOT/bin/qemu-share"
