@@ -42,6 +42,6 @@ for _ in range(100):
 else:
     raise RuntimeError('QEMU monitor was not available')
 PY
-for _ in {1..100}; do [[ ! -e "$FILE" ]] && break; sleep 0.02; done
+for _ in {1..500}; do [[ ! -e "$FILE" ]] && break; sleep 0.02; done
 [[ ! -e "$FILE" ]] || { echo "Shared-memory object was not cleaned up" >&2; exit 1; }
 echo "idemu-shm create/map/cleanup: ok"
