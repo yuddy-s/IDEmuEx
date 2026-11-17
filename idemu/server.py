@@ -2,7 +2,7 @@
 import os, re, subprocess, json, time, shutil, threading, traceback, mimetypes, datetime, sys, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from . import catalog, builder, runtime, codegen, coding, coding7, coding8, stats, mgu, mgu7, phone, cluster, cic, vin, sysfiles
+from . import catalog, builder, runtime, codegen, coding, coding7, coding8, stats, mgu, mgu7, phone, cluster, cic, vin, sysfiles, hostcaps
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENVS = os.path.join(ROOT, 'environments')
@@ -571,7 +571,7 @@ class H(BaseHTTPRequestHandler):
         if path == 'state':
             return {'settings': {'psdz_path': catalog.load_settings().get('psdz_path'), 'psdz_ok': catalog.psdz_ok(catalog.load_settings().get('psdz_path')), 'ui_language': catalog.load_settings().get('ui_language', 'en')}, 'envs': A.list_envs(),
                     'running': A.rt.id if A.rt and A.rt.state in ('booting', 'running') else None, 'version': VERSION,
-                    'capabilities': {'vm': NATIVE_VM_SUPPORTED, 'host': sys.platform}}
+                    'capabilities': hostcaps.capabilities()}
         if path == 'settings' and m == 'POST' and 'ui_language' in d:
             if d['ui_language'] not in ('en', 'pt', 'es', 'fr', 'de', 'it', 'tr', 'ru', 'zh', 'ja'): raise ApiError('idioma inválido')
             catalog.save_settings({'ui_language': d['ui_language']}); return {'ok': True}

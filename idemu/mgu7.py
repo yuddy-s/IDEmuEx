@@ -1,7 +1,7 @@
 """iDrive 7 (MGU, x86-64 Linux): monta a raiz do RSE a partir da PSdZData e roda QEMU x86-64 (TCG) + glhost7.
 O HMI do banco traseiro (HmiMain3D, RSE_HIGH_LEFT) desenha pela ponte GL (ttyS1) e recebe toque pela serial ttyS0 (idemu-wl -> wl_pointer). Detalhes em docs/OUTRAS_GERACOES.md (parte 6)."""
 import glob, mmap, os, re, shutil, socket, struct, subprocess, sys, threading, time, zlib
-from . import runtime, coding7
+from . import runtime, coding7, hostcaps
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(ROOT, 'tools', 'mgu')
@@ -134,6 +134,8 @@ SHM_BYTES = 128 << 20                                              # SHM_SIZE de
 def find_qemu():
     for p in (os.environ.get('IDEMU_QEMU_X86'), QEMU_OWN, shutil.which('qemu-system-x86_64'), '/opt/homebrew/bin/qemu-system-x86_64', '/usr/local/bin/qemu-system-x86_64'):
         if p and os.path.exists(p): return p
+    if sys.platform == 'linux':
+        raise RuntimeError('qemu-system-x86_64 não encontrado: execute tools/wsl/bootstrap.sh e tools/wsl/build-qemu.sh')
     raise RuntimeError('qemu-system-x86_64 não encontrado: instale com "brew install qemu"')
 def has_shm(qemu):
     """O QEMU do IDEmu (bin/qemu-system-x86_64) tem o dispositivo idemu-shm: o canal gráfico vai por memória compartilhada (≈ 100x mais rápido que a serial)."""
@@ -149,10 +151,11 @@ def qemu_img():
         if p and os.path.exists(p): return p
 
 def clone_file(src, dst):
-    """Cópia instantânea no APFS (clonefile); cópia comum nos demais sistemas de arquivos."""
+    """Reflink no APFS/Linux quando disponível; cópia comum nos demais sistemas de arquivos."""
     try: os.unlink(dst)
     except OSError: pass
-    if subprocess.run(['cp', '-c', src, dst], capture_output=True).returncode: shutil.copyfile(src, dst)
+    flag = '-c' if sys.platform == 'darwin' else '--reflink=auto'
+    if subprocess.run(['cp', flag, src, dst], capture_output=True).returncode: shutil.copyfile(src, dst)
 
 class Mgu7Runtime(runtime.Runtime):
     kind = 'mgu7'; disp = (1920, 1080)
@@ -298,6 +301,7 @@ class Mgu7Runtime(runtime.Runtime):
                     r = subprocess.run([qemu_img(), 'create', '-q', '-f', 'qcow2', '-b', OUT + '/root.img', '-F', 'raw', self.overlay], capture_output=True, text=True)
                     if r.returncode: raise RuntimeError('qemu-img: ' + (r.stderr or r.stdout)[-200:])
             genv = dict(os.environ)
+            genv.update(hostcaps.renderer_environment(glhost_path()))
             if os.environ.get('IDEMU_PROF'): genv['GLHOST7_PROF'] = '1'
             if capable and not restore: genv['GLHOST7_REC'] = os.path.join(self.run, 'gl.rec')            # o fluxo do boot, para o snapshot
             glcmd = [glhost_path(), ('shm:' + self.shm) if self.shm else gsock, self.run] + (['--replay', os.path.join(self.snap_dir, 'gl.rec')] if restore else [])

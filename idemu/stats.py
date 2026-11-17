@@ -4,7 +4,7 @@ Um amostrador em segundo plano mede, a cada segundo, o QEMU (a VM) e o renderiza
 CPU, RAM residente, quadros por segundo e tempo de quadro, GPU do Mac e o espaço em disco do ambiente.
 Só usa `ps`, `ioreg`, `sysctl` e o cabeçalho do quadro compartilhado: nada é injetado na VM.
 """
-import os, re, time, shutil, threading, subprocess, collections
+import os, re, time, shutil, threading, subprocess, collections, sys
 
 INTERVAL = 1.0
 HISTORY = 900            # 15 minutos a 1 amostra/s
@@ -83,6 +83,18 @@ def host_ram_bytes():
                 (name, ctypes.c_ulonglong) for name in ('total_phys', 'avail_phys', 'total_page', 'avail_page', 'total_virtual', 'avail_virtual', 'avail_extended')]
         status = MemoryStatus(); status.length = ctypes.sizeof(status)
         return status.total_phys if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)) else 0
+    if sys.platform.startswith('linux'):
+        try:
+            with open('/proc/meminfo', encoding='ascii') as f:
+                for line in f:
+                    if line.startswith('MemTotal:'):
+                        return int(line.split()[1]) * 1024
+        except (OSError, ValueError, IndexError):
+            pass
+        try:
+            return os.sysconf('SC_PHYS_PAGES') * os.sysconf('SC_PAGE_SIZE')
+        except (OSError, ValueError):
+            return 0
     return Sampler._sysctl('hw.memsize')
 
 def gpu_info():

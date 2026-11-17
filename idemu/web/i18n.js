@@ -1425,6 +1425,7 @@ window.IDE = window.IDE || {};
     ['bin/qemu-system-sh4 não existe: rode src/cic/build.sh', 'bin/qemu-system-sh4 does not exist: run src/cic/build.sh'],
     ['ANGLE não encontrado: instale um app baseado em Chromium ou defina IDEMU_ANGLE com a pasta de libEGL.dylib e libGLESv2.dylib', 'ANGLE not found: install a Chromium-based app or set IDEMU_ANGLE to the folder with libEGL.dylib and libGLESv2.dylib'],
     ['qemu-system-x86_64 não encontrado: instale com "brew install qemu"', 'qemu-system-x86_64 not found: install it with "brew install qemu"'],
+    ['qemu-system-x86_64 não encontrado: execute tools/wsl/bootstrap.sh e tools/wsl/build-qemu.sh', 'qemu-system-x86_64 not found: run tools/wsl/bootstrap.sh and tools/wsl/build-qemu.sh'],
     ['não consegui preparar o arquivo: %s', 'could not stage the file: %s'],
     ['o dicionário de codificação do iDrive 8 ainda não foi extraído: configure a PSdZData e reconstrua o ambiente', 'the iDrive 8 coding dictionary has not been extracted yet: set the PSdZData and rebuild the environment'],
     ['Reinicie o ambiente para o HMI ler a nova codificação.', 'Restart the environment so the HMI reads the new coding.'],

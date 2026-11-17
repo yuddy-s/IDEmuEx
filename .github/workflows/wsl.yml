@@ -1,0 +1,53 @@
+name: WSL/Linux host checks
+on:
+  push:
+    branches: [main, feat/idrive7-wsl]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang pkg-config libegl1-mesa-dev libgl-dev xvfb
+      - name: Build renderer
+        run: src/mgu/build_host.sh
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          EGL_PLATFORM: surfaceless
+      - name: Synthetic frame
+        run: |
+          mkdir -p /tmp/idemu-render-test
+          bin/glhost7 --selftest /tmp/idemu-render-test
+          python3 - <<'PY'
+          import os, struct
+          p='/tmp/idemu-render-test/frame.rgba'
+          b=open(p,'rb').read()
+          assert len(b) == 64 + 64*32*4
+          assert struct.unpack_from('<iii', b) == (64, 32, 1)
+          assert len(set(b[64:])) > 1
+          PY
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          EGL_PLATFORM: surfaceless
+      - name: Python tests
+        run: python3 -m unittest discover -s tests
+      - name: Renderer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glhost7-ubuntu
+          path: bin/glhost7
+  qemu-device:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build pkg-config libglib2.0-dev libpixman-1-dev
+      - name: Download official QEMU source
+        run: curl -fL https://download.qemu.org/qemu-11.1.2.tar.xz -o /tmp/qemu-11.1.2.tar.xz
+      - name: Build and probe custom device
+        run: |
+          tools/wsl/build-qemu.sh /tmp/qemu-11.1.2.tar.xz
+          tools/wsl/smoke-qemu.sh

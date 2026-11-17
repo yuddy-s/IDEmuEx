@@ -20,6 +20,7 @@
 /idemu/web/themes/nbt_*
 # Local configuration (contains the path to your PSdZData)
 /settings.json
+/.idemu/
 # Generated at run time (self-signed TLS key and certificate for the phone link)
 /idemu/data/phone/
 # ---- Provenance not verified: photos of car interiors and screenshots of the BMW HMI ----------------------------------

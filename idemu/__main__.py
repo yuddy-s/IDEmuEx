@@ -7,12 +7,16 @@ USAGE = """IDEmuEx - BMW iDrive head-unit tools
   python3 -m idemu build <id>                      compila o ambiente a partir dos SWFL
   python3 -m idemu run <id>                        inicia o ambiente (Ctrl+C encerra)
   python3 -m idemu ssh <id>                        abre o shell da head unit (ambiente em execução via 'gui' ou 'run')
+  python3 -m idemu doctor --target id7 [--psdz DIR] [--hash] [--json]
 """
 
 def main(argv):
     if not argv or argv[0] in ('-h', '--help', 'help'):
         print(USAGE); return 0
     cmd = argv[0]
+    if cmd == 'doctor':
+        from . import doctor
+        return doctor.main(argv[1:])
     if cmd == 'gui':
         port = 8765
         if '--port' in argv: port = int(argv[argv.index('--port') + 1])
