@@ -23,11 +23,12 @@ system: the firmware packages do not carry map data and the navigation engine do
 
 ## What you need
 
-* A Mac with Apple Silicon (iDrive 8 uses the Hypervisor framework) and macOS 14 or later. Python 3 (the system one is enough).
+* For the original path, a Mac with Apple Silicon and macOS 14 or later (iDrive 8 uses the Hypervisor framework). For iDrive 7 on Windows, use Windows 11 with Ubuntu WSL2 and follow [the WSL2 guide](docs/WSL2.md). Native Windows VM execution is not supported.
+* Python 3.10 or later.
 * Your **own firmware packages** (PSdZData / SWFL files). The assistant tells you which exact files each iDrive version needs and can scan a folder
   for them. Nothing is modified; images are built in the project folder.
-* A QEMU build: the project uses custom QEMU 11.1.2 builds (OMAP5, SH7785 and `idemu-shm` devices). Source and recipe: [src/qemu](src/qemu) and
-  [tools/qemu/build.sh](tools/qemu/build.sh). Homebrew `qemu` provides `qemu-img` (needed for the iDrive 7 snapshot) and `qemu-system-aarch64` (iDrive 8).
+* A QEMU build: the project uses custom QEMU 11.1.2 builds (OMAP5, SH7785 and `idemu-shm` devices). Source and recipes: [src/qemu](src/qemu),
+  [tools/qemu/build.sh](tools/qemu/build.sh), and [tools/wsl/build-qemu.sh](tools/wsl/build-qemu.sh). Homebrew `qemu` supplies additional macOS tools.
 * Renderer helpers (`glhost`, `glhost7`, `mguhost`) are built from [src](src) with clang. iDrive 8 also needs ANGLE (`libEGL.dylib` and `libGLESv2.dylib`),
   found in any installed Chromium-based app, or set `IDEMU_ANGLE`.
 
