@@ -42,10 +42,12 @@ for _ in range(100):
 else:
     raise RuntimeError('QEMU monitor was not available')
 PY
-PID=$(cat "$PIDFILE")
-for _ in {1..100}; do kill -0 "$PID" 2>/dev/null || break; sleep 0.02; done
-kill "$PID" 2>/dev/null || true
-for _ in {1..100}; do kill -0 "$PID" 2>/dev/null || break; sleep 0.02; done
+if [[ -f "$PIDFILE" ]]; then
+  PID=$(cat "$PIDFILE")
+  for _ in {1..100}; do kill -0 "$PID" 2>/dev/null || break; sleep 0.02; done
+  kill "$PID" 2>/dev/null || true
+  for _ in {1..100}; do kill -0 "$PID" 2>/dev/null || break; sleep 0.02; done
+fi
 python3 - "$ROOT" "$NAME" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
