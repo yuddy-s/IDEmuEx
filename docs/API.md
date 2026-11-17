@@ -6,6 +6,9 @@ Textos de UI em inglês por padrão, com português do Brasil selecionável (`se
 
 ## Estado geral
 GET  /api/state -> {"settings":{"psdz_path":"/Users/x/Downloads/psdzdata"|null},
+       "capabilities":{"vm":true|false,"host":"linux|darwin|win32","backend":"wsl2|linux|macos|windows-ui-only",
+                       "renderer":{"available":bool,"name":string|null,"accelerated":bool,"detail":string},
+                       "qemu":{"available":bool,"path":string|null,"idemu_shm":bool},"fast_boot":bool},
                     "envs":[Env...], "running":"<env id>"|null, "version":"0.1"}
 POST /api/settings {"psdz_path":"..."} -> {"ok":true,"psdz_ok":true,"message":"..."}
 POST /api/settings {"ui_language":"en"|"pt"} -> {"ok":true}   (idioma da interface; padrão "en", devolvido em /api/state em settings.ui_language)

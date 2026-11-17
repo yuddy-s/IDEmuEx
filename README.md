@@ -1,6 +1,6 @@
 # IDEmuEx: cross-platform work on the BMW iDrive emulator
 
-IDEmuEx is a noncommercial fork of [IDEmu](https://github.com/herrbimmer/IDEmu). It adds a Windows-checkout-safe tree, a Windows launcher, and a native Windows web interface for environment and firmware tools. **VM execution on Windows is still in development**; see [Windows status and setup](docs/WINDOWS.md). macOS users can continue with the upstream workflow below.
+IDEmuEx is a noncommercial fork of [IDEmu](https://github.com/herrbimmer/IDEmu). It adds a Windows-checkout-safe tree, a Windows launcher, and a native Windows web interface for environment and firmware tools. Native Windows VM execution is still in development; iDrive 7 can use the Linux backend described in [Windows/WSL2 setup](docs/WSL2.md). See [native Windows status](docs/WINDOWS.md) for the remaining boundary. macOS users can continue with the upstream workflow below.
 
 IDEmu runs the **original head-unit software** of BMW iDrive systems (HMI, window system and services) inside QEMU virtual machines, with its own
 web interface, a virtual iDrive controller, virtual CAN bus and GPS, and a coding editor. It is a research and learning tool: you bring your own
@@ -36,6 +36,7 @@ system: the firmware packages do not carry map data and the navigation engine do
 ```bash
 ./IDEmu.command        # opens IDEmu in an Electron window (cd electron && npm install once); without Electron it opens your browser
 python3 -m idemu gui   # the same, web interface at http://127.0.0.1:8765
+python3 -m idemu doctor --target id7 --psdz /path/to/psdzdata  # WSL2/runtime and exact-package gate
 ```
 
 New environment → iDrive version → car model → required files → parameters → create → build (~20 s for iDrive 5/6) → start. Command line:

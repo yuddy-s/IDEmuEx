@@ -30,7 +30,9 @@ class WindowsHostTests(unittest.TestCase):
                     response = conn.getresponse()
                     data = json.loads(response.read())
                     self.assertEqual(response.status, 200)
-                    self.assertEqual(data['capabilities'], {'vm': False, 'host': 'win32'})
+                    self.assertFalse(data['capabilities']['vm'])
+                    self.assertEqual(data['capabilities']['host'], 'win32')
+                    self.assertEqual(data['capabilities']['backend'], 'windows-ui-only')
                     conn.close()
                     with self.assertRaisesRegex(server.ApiError, 'VM execution is not available'):
                         server.APP.start('any-id')

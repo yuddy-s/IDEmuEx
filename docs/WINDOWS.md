@@ -18,6 +18,8 @@ The Windows interface supports package selection, environment setup, file browsi
 
 **The head-unit VM does not run on native Windows yet.** The interface disables Start and the API returns a clear error. The upstream runtime expects Unix domain sockets, POSIX shared memory and signals, macOS OpenGL/CGL/GLUT renderers, and custom QEMU devices. iDrive 8 additionally uses Apple's Hypervisor framework and `DYLD_INSERT_LIBRARIES`. WSL alone does not supply those macOS parts.
 
+The iDrive 7 host components now have a Linux/EGL backend intended for WSL2. Follow [the WSL2 guide](WSL2.md); the backend, generated images and firmware packages must live in the Ubuntu filesystem for acceptable performance.
+
 Full execution needs Windows or portable replacements for the three renderer helpers, the host-side QEMU integration, and runtime IPC. Each iDrive generation must then be boot-tested using licensed firmware. The existing macOS path is retained.
 
 ## Checkout fix

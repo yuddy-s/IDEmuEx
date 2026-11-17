@@ -1,9 +1,16 @@
-// glhost7: renderizador no Mac para o iDrive 7. Recebe o fluxo EGL/GLES3 do guest (gles_guest.c) por um socket
-// unix do QEMU (ttyS1), executa em OpenGL 4.1 core (CGL, fora da tela) e grava cada quadro em <saida>/frame.rgba.
+// glhost7: renderizador do host para o iDrive 7. Recebe o fluxo EGL/GLES3 do guest (gles_guest.c) por um socket
+// unix do QEMU (ttyS1), executa em OpenGL 4.1 core e grava cada quadro em <saida>/frame.rgba.
 // Uso: glhost7 <socket do QEMU> <pasta de saída>
 #define GL_SILENCE_DEPRECATION 1
+#ifdef __APPLE__
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl3.h>
+#else
+#define GL_GLEXT_PROTOTYPES 1
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GL/glcorearb.h>
+#endif
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -53,10 +60,19 @@ static void rec_close(void) {
   fclose(rec); rec = NULL; char p[640]; snprintf(p, sizeof p, "%s.done", rec_path); FILE *f = fopen(p, "w"); if (f) { fputs("ok\n", f); fclose(f); }
   fprintf(stderr, "glhost7: gravação do fluxo encerrada\n");
 }
+static inline void cpu_relax(void) {
+#if defined(__aarch64__) || defined(__arm__)
+  __asm__ volatile("yield" ::: "memory");
+#elif defined(__x86_64__) || defined(__i386__)
+  __asm__ volatile("pause" ::: "memory");
+#else
+  __asm__ volatile("" ::: "memory");
+#endif
+}
 static void idle_wait(unsigned *n) {                 // espera curta: gira um pouco (latência baixa quando o guest está ativo) e depois dorme
   if (H && at_hdr) H->host_idle = 1;
   if (stop_rec && at_hdr) rec_close();
-  if (++*n < 400) { __asm__ volatile("yield" ::: "memory"); return; }
+  if (++*n < 400) { cpu_relax(); return; }
   if (*n < 4000) { usleep(30); return; }
   usleep(600);
 }
@@ -286,10 +302,33 @@ static void del1(int kind, GLuint r) {
 }
 
 static void init_gl(void) {
+#ifdef __APPLE__
   CGLPixelFormatAttribute at[] = { kCGLPFAOpenGLProfile, (CGLPixelFormatAttribute)kCGLOGLPVersion_GL4_Core, kCGLPFAAccelerated, kCGLPFAColorSize, (CGLPixelFormatAttribute)24, (CGLPixelFormatAttribute)0 };
   CGLPixelFormatObj pf; GLint n; if (CGLChoosePixelFormat(at, &pf, &n) || !pf) die("sem formato de pixel GL 4.1");
   CGLContextObj ctx; if (CGLCreateContext(pf, NULL, &ctx)) die("CGLCreateContext"); CGLSetCurrentContext(ctx);
+#else
+  static EGLDisplay dpy; static EGLContext ctx; static EGLSurface surf;
+  PFNEGLGETPLATFORMDISPLAYEXTPROC get_platform = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+  if (get_platform) dpy = get_platform(EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, NULL);
+  if (dpy == EGL_NO_DISPLAY) dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  EGLint major = 0, minor = 0; if (dpy == EGL_NO_DISPLAY || !eglInitialize(dpy, &major, &minor)) die("EGL display indisponível");
+  if (!eglBindAPI(EGL_OPENGL_API)) die("EGL não oferece OpenGL");
+  const EGLint cfg_at[] = { EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+                            EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE };
+  EGLConfig cfg; EGLint count = 0; if (!eglChooseConfig(dpy, cfg_at, &cfg, 1, &count) || !count) die("sem configuração EGL/OpenGL");
+  const EGLint pb_at[] = { EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE };
+  surf = eglCreatePbufferSurface(dpy, cfg, pb_at); if (surf == EGL_NO_SURFACE) die("EGL pbuffer falhou");
+  const EGLint ctx_at[] = { EGL_CONTEXT_MAJOR_VERSION, 4, EGL_CONTEXT_MINOR_VERSION, 1,
+                            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE };
+  ctx = eglCreateContext(dpy, cfg, EGL_NO_CONTEXT, ctx_at); if (ctx == EGL_NO_CONTEXT) die("contexto OpenGL 4.1 indisponível");
+  if (!eglMakeCurrent(dpy, surf, surf, ctx)) die("eglMakeCurrent");
+#endif
   fprintf(stderr, "glhost7: %s | %s\n", glGetString(GL_RENDERER), glGetString(GL_VERSION));
+#ifndef __APPLE__
+  const char *renderer = (const char *)glGetString(GL_RENDERER);
+  if (renderer && (strstr(renderer, "llvmpipe") || strstr(renderer, "softpipe")))
+    fprintf(stderr, "glhost7: AVISO: renderização por software; verifique /dev/dxg e Mesa D3D12 no WSL2\n");
+#endif
   glGenVertexArrays(1, &vao0); glBindVertexArray(vao0);
   glEnable(GL_PROGRAM_POINT_SIZE);
 }
@@ -319,6 +358,11 @@ static void init_surface(u32 id, int w, int h) {
 }
 
 int main(int argc, char **argv) {
+  if (argc == 2 && !strcmp(argv[1], "--probe")) { init_gl(); return 0; }
+  if (argc == 3 && !strcmp(argv[1], "--selftest")) {
+    strncpy(outdir, argv[2], sizeof outdir - 1); mkdir(outdir, 0755); idmap = calloc(IDMAX, 4); init_gl();
+    init_surface(1, 64, 32); glClearColor(0.125f, 0.25f, 0.5f, 1.0f); glClear(GL_COLOR_BUFFER_BIT); glFinish(); save_frame(); return 0;
+  }
   if (argc < 3) die("uso: glhost7 <socket|shm:nome> <pasta> [--replay arquivo]");
   strncpy(outdir, argv[2], sizeof outdir - 1); mkdir(outdir, 0755); verbose = getenv("GLHOST7_VERBOSE") != NULL; prof = getenv("GLHOST7_PROF") != NULL;
   idmap = calloc(IDMAX, 4); init_gl();
