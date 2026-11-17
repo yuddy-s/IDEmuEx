@@ -6,7 +6,9 @@ from idemu import doctor, hostcaps
 
 
 class HostCapsTests(unittest.TestCase):
-    def tearDown(self): hostcaps.capabilities.cache_clear()
+    def tearDown(self):
+        hostcaps.capabilities.cache_clear()
+        hostcaps.renderer_environment.cache_clear()
 
     def test_backend_names_are_public_and_stable(self):
         with mock.patch.object(hostcaps.sys, 'platform', 'win32'):

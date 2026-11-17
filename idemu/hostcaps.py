@@ -21,15 +21,31 @@ def backend():
     return 'linux'
 
 
+@functools.lru_cache(maxsize=4)
+def renderer_environment(path):
+    """Return the smallest environment override that enables WSL GPU rendering."""
+    if not (is_wsl() and os.path.exists('/dev/dxg')) or os.environ.get('GALLIUM_DRIVER'):
+        return {}
+    env = dict(os.environ); env['GALLIUM_DRIVER'] = 'd3d12'
+    try:
+        r = subprocess.run([path, '--probe'], capture_output=True, text=True, timeout=15, env=env)
+        if r.returncode == 0 and 'D3D12' in (r.stdout + r.stderr): return {'GALLIUM_DRIVER': 'd3d12'}
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return {}
+
+
 def _probe_renderer(path):
     if not os.path.isfile(path): return {'available': False, 'name': None, 'accelerated': False, 'detail': 'bin/glhost7 missing'}
     try:
-        r = subprocess.run([path, '--probe'], capture_output=True, text=True, timeout=15)
+        override = renderer_environment(path); env = dict(os.environ); env.update(override)
+        r = subprocess.run([path, '--probe'], capture_output=True, text=True, timeout=15, env=env)
         detail = (r.stderr or r.stdout).strip().splitlines()
         line = next((x for x in detail if x.startswith('glhost7: ') and ' | ' in x), '')
         name = line[len('glhost7: '):].split(' | ', 1)[0] if line else None
         software = bool(name and any(x in name.lower() for x in ('llvmpipe', 'softpipe', 'swrast')))
         return {'available': r.returncode == 0, 'name': name, 'accelerated': r.returncode == 0 and not software,
+                'driver': override.get('GALLIUM_DRIVER'),
                 'detail': '\n'.join(detail[-3:]) or ('exit %d' % r.returncode)}
     except (OSError, subprocess.SubprocessError) as e:
         return {'available': False, 'name': None, 'accelerated': False, 'detail': str(e)}

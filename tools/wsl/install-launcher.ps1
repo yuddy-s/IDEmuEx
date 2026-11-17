@@ -1,10 +1,19 @@
 param(
     [string]$Distro = "Ubuntu",
     [Parameter(Mandatory=$true)][string]$WslRepoPath,
-    [string]$Destination = "$env:USERPROFILE\Desktop\IDEmuEx WSL.cmd"
+    [string]$Destination
 )
 $ErrorActionPreference = "Stop"
 if (-not $WslRepoPath.StartsWith('/')) { throw "WslRepoPath must be an absolute Linux path" }
+if (-not $Destination) {
+    $desktop = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
+    if (-not $desktop) { throw "Windows did not report a Desktop directory" }
+    $Destination = Join-Path $desktop "IDEmuEx WSL.cmd"
+}
+$destinationDir = Split-Path -Parent $Destination
+if (-not (Test-Path -LiteralPath $destinationDir -PathType Container)) {
+    throw "Launcher destination directory does not exist: $destinationDir"
+}
 $escapedRepo = $WslRepoPath.Replace('"', '""')
 $escapedDistro = $Distro.Replace('"', '""')
 $body = @"
