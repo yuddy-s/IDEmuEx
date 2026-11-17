@@ -17,7 +17,7 @@ cleanup() {
 trap cleanup EXIT
 
 [[ -x "$QEMU" ]] || { echo "Custom QEMU missing: $QEMU" >&2; exit 2; }
-"$QEMU" -M q35 -nodefaults -display none -monitor none -serial none -S \
+"$QEMU" -L "$ROOT/bin/qemu-share" -M q35 -nodefaults -display none -monitor none -serial none -S \
   -device "idemu-shm,shm-name=$NAME,size=4M" -daemonize -pidfile "$PIDFILE"
 for _ in {1..100}; do [[ -f "$FILE" ]] && break; sleep 0.02; done
 [[ -f "$FILE" ]] || { echo "Shared-memory object was not created" >&2; exit 1; }
